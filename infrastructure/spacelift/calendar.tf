@@ -6,7 +6,7 @@ resource "spacelift_space" "calendar" {
 
 resource "spacelift_stack" "calendar-production" {
   name                     = "Calendar - production"
-  space_id                 = data.spacelift_space_by_path.calendar.id
+  space_id                 = spacelift_space.mostly_cats.id
   repository               = "design"
   branch                   = "main"
   project_root             = "calendar/infrastructure"
@@ -15,7 +15,7 @@ resource "spacelift_stack" "calendar-production" {
   terraform_version        = "1.5.7 - 1.6.2"
 }
 
-# resource "spacelift_aws_integration_attachment" "calendar-production" {
-#   stack_id = spacelift_stack.calendar-production.id
-#   integration_id = data.spacelift_aws_integration.default.id
-# }
+resource "spacelift_aws_integration_attachment" "calendar-production" {
+  stack_id = spacelift_stack.calendar-production.id
+  integration_id = data.spacelift_aws_integration.default.id
+}
