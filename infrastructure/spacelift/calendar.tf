@@ -14,3 +14,8 @@ resource "spacelift_stack" "calendar-production" {
   workspace               = "production"
   terraform_version        = "1.5.7 - 1.6.2"
 }
+
+resource "spacelift_aws_integration_attachment" "calendar-production" {
+  stack_id = spacelift_stack.calendar-production.id
+  integration_id = data.spacelift_aws_integration.default.id
+}
