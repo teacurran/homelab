@@ -8,11 +8,7 @@ terraform {
   }
 }
 
-data "spacelift_space_by_path" "root" {
-  space_path = "root"
+data "spacelift_space_by_path" "base" {
+  space_path = "root/186282"
 }
 
-resource "spacelift_space" "base" {
-  name = "186282"
-  parent_space_id = data.spacelift_space_by_path.root.id
-}
