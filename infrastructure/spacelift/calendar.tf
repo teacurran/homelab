@@ -6,7 +6,7 @@ resource "spacelift_space" "calendar" {
 
 resource "spacelift_stack" "calendar-production" {
   name                     = "Calendar - production"
-  space_id                 = spacelift_space.calendar.id
+  space_id                 = data.spacelift_space_by_path.calendar.id
   repository               = "design"
   branch                   = "main"
   project_root             = "calendar/infrastructure"
