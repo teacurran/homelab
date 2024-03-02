@@ -11,7 +11,7 @@ resource "spacelift_stack" "calendar-production" {
   branch                   = "main"
   project_root             = "calendar/infrastructure"
   manage_state             = false
-  workspace               = "production"
+  terraform_workspace      = "production"
   terraform_version        = "1.5.7 - 1.6.2"
 }
 
