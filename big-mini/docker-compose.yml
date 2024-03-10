@@ -53,9 +53,7 @@ services:
       - grafana
       - influxdb
       - chronograf
-    env_file:
-      - path: ./.env
-        required: true
+    env_file: .env
     environment:
       - UP_INFLUXDB_DB=${INFLUXDB_DB}
       - UP_INFLUXDB_USER=${INFLUXDB_ADMIN_USER}
