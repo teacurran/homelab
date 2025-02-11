@@ -19,6 +19,7 @@ services:
       - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_ADMIN_TOKEN}
       - DOCKER_INFLUXDB_INIT_RETENTION=16w
+
   chronograf:
     image: chronograf:latest
     restart: always
@@ -33,6 +34,7 @@ services:
       - INFLUXDB_URL=http://influxdb:8086
       - INFLUXDB_USERNAME=${INFLUXDB_ADMIN_USER}
       - INFLUXDB_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+
   grafana:
     image: grafana/grafana:latest
     restart: always
@@ -47,6 +49,7 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USERNAME}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
       - GF_INSTALL_PLUGINS=grafana-clock-panel,natel-discrete-panel,grafana-piechart-panel
+
   unpoller:
     restart: always
     image: ghcr.io/unpoller/unpoller:latest
@@ -70,7 +73,121 @@ services:
       - UP_UNIFI_DEFAULT_SAVE_DPI=${POLLER_SAVE_DPI}
     volumes:
       - ./unpoller/up.conf:/etc/unpoller/up.conf
+  
+  suitecrmdb:
+    image: docker.io/bitnami/mariadb:11.4
+    environment:
+      # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+      - MARIADB_USER=bn_suitecrm
+      - MARIADB_DATABASE=bitnami_suitecrm
+      - MARIADB_PASSWORD=bitnami123
+    volumes:
+      - suitecrmdb-storage:/bitnami/mariadb
+
+  suitecrm:
+    image: docker.io/bitnami/suitecrm:8
+    ports:
+      - '8084:8080'
+      - '8443:8443'
+    environment:
+      - SUITECRM_DATABASE_HOST=suitecrmdb
+      - SUITECRM_DATABASE_PORT_NUMBER=3306
+      - SUITECRM_DATABASE_USER=bn_suitecrm
+      - SUITECRM_DATABASE_NAME=bitnami_suitecrm
+      - SUITECRM_DATABASE_PASSWORD=bitnami123
+      # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - suitecrm-data:/bitnami/suitecrm
+    depends_on:
+      - suitecrmdb
+
+  database:
+    container_name: database
+    image: postgres
+    restart: always
+    volumes:
+      - database-data:/var/lib/postgresql/data/
+    env_file: .env
+    networks:
+      - stack
+
+  calcom:
+    image: calcom.docker.scarf.sh/calcom/cal.com
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_WEBAPP_URL: ${NEXT_PUBLIC_WEBAPP_URL}
+        NEXT_PUBLIC_API_V2_URL: ${NEXT_PUBLIC_API_V2_URL}
+        NEXT_PUBLIC_LICENSE_CONSENT: ${NEXT_PUBLIC_LICENSE_CONSENT}
+        CALCOM_TELEMETRY_DISABLED: ${CALCOM_TELEMETRY_DISABLED}
+        NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+        CALENDSO_ENCRYPTION_KEY: ${CALENDSO_ENCRYPTION_KEY}
+        DATABASE_URL: ${DATABASE_URL}
+        DATABASE_DIRECT_URL: ${DATABASE_URL}
+      network: stack
+    restart: always
+    networks:
+      - stack
+    ports:
+      - 3000:3000
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DATABASE_HOST}/${POSTGRES_DB}
+      - DATABASE_DIRECT_URL=${DATABASE_URL}
+    depends_on:
+      - database
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    environment:
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 7080
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "true"
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7080/health/ready"]
+      interval: 15s
+      timeout: 2s
+      retries: 15
+    command: ["start-dev", "--http-port", "7080", "--https-port", "7443"]
+    ports:
+      - "7080:7080"
+      - "7443:7443"
+    networks:
+      - local_network
+
+  solar2-livestream:
+    image: tiangolo/nginx-rtmp
+    container_name: nginx-rtmp
+    # ports:
+    #   - "1935:1935" # RTMP port
+    volumes:
+      - ./solar2-livestream/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: always
+
+  solar2-encoder:
+    image: jrottenberg/ffmpeg:4.4-alpine
+    container_name: ffmpeg-stream
+    restart: always
+    command: >
+      ffmpeg -rtsp_transport tls -i "rtsps://10.10.0.1:7441/goPY7RmpQd5UbM1L?enableSrtp" 
+      -c:v libx264 -preset veryfast -b:v 4500k -maxrate 4500k -bufsize 9000k
+      -c:a aac -b:a 128k -f flv "rtmp://solar2-livestream/live/unifi"
+
 volumes:
   influxdb-storage:
   chronograf-storage:
   grafana-storage:
+  suitecrmdb-storage:
+  suitecrm-data:
+  database-data:
+
+networks:
+  local_network:
+    driver: bridge
